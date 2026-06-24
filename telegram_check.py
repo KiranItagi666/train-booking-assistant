@@ -2,16 +2,17 @@ from telegram import Bot
 import pandas as pd
 from datetime import date, timedelta
 import asyncio
+import os
 
 # =========================
 # CONFIGURATION
 # =========================
 
-BOT_TOKEN = "8955527381:AAFrBzVlizMART5ywTXdLd0ZqIdlpsefyrQ"
-CHAT_ID = "926596744"
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID = os.environ["CHAT_ID"]
 
 # =========================
-# CHECK BOOKINGS
+# READ BOOKINGS
 # =========================
 
 df = pd.read_csv("bookings.csv")
@@ -23,24 +24,35 @@ booked = set(
     )
 )
 
+# =========================
+# CHECK FUTURE BOOKINGS
+# =========================
+
 today = date.today()
-end_date = today + timedelta(days=60)
+
+# Check trips 50–70 days ahead
+start_date = today + timedelta(days=50)
+end_date = today + timedelta(days=70)
 
 missing = []
 
-current = today
+current = start_date
 
 while current <= end_date:
 
-    # Monday
+    # Monday: Belagavi -> Bangalore
     if current.weekday() == 0:
         if (current, "BGM-SBC") not in booked:
-            missing.append(f"❌ {current} BGM → SBC")
+            missing.append(
+                f"❌ {current} BGM → SBC"
+            )
 
-    # Thursday
+    # Thursday: Bangalore -> Belagavi
     if current.weekday() == 3:
         if (current, "SBC-BGM") not in booked:
-            missing.append(f"❌ {current} SBC → BGM")
+            missing.append(
+                f"❌ {current} SBC → BGM"
+            )
 
     current += timedelta(days=1)
 
@@ -54,7 +66,7 @@ if missing:
     message += "Missing Bookings:\n\n"
     message += "\n".join(missing)
 else:
-    message += "✅ All bookings present for next 60 days"
+    message += "✅ All bookings present for the booking window."
 
 # =========================
 # SEND TO TELEGRAM
@@ -62,6 +74,7 @@ else:
 
 async def send_message():
     bot = Bot(token=BOT_TOKEN)
+
     await bot.send_message(
         chat_id=CHAT_ID,
         text=message
@@ -69,4 +82,4 @@ async def send_message():
 
 asyncio.run(send_message())
 
-print("Telegram notification sent successfully!")
+print("✅ Telegram notification sent successfully!")
