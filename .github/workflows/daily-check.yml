@@ -20,9 +20,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Run Booking Checker
+      - name: Run Travel Dashboard
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          python telegram_check.py
+          python telegram_dashboard.py
