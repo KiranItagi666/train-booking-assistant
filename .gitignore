@@ -1,3 +1,10 @@
 venv/
 __pycache__/
+
+token.json
+credentials.json
+
+.env
+
 *.pyc
+*.html
