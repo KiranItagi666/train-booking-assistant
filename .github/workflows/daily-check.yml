@@ -2,7 +2,7 @@ name: Train Booking Checker
 
 on:
   schedule:
-    - cron: '00 3 * * *'
+    - cron: '10 3 * * *'
   workflow_dispatch:
 
 jobs:
