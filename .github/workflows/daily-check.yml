@@ -17,9 +17,42 @@ jobs:
           python-version: '3.13'
 
       - name: Restore Gmail Credentials
+        shell: bash
         run: |
-          echo "${{ secrets.GOOGLE_CREDENTIALS }}" | base64 -d > credentials.json
-          echo "${{ secrets.GOOGLE_TOKEN }}" | base64 -d > token.json
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          creds_b64 = os.environ.get("GOOGLE_CREDENTIALS", "")
+          token_b64 = os.environ.get("GOOGLE_TOKEN", "")
+
+          if not creds_b64:
+              raise SystemExit("GOOGLE_CREDENTIALS secret is missing")
+          if not token_b64:
+              raise SystemExit("GOOGLE_TOKEN secret is missing")
+
+          creds_bytes = base64.b64decode(creds_b64)
+          token_bytes = base64.b64decode(token_b64)
+
+          Path("credentials.json").write_bytes(creds_bytes)
+          Path("token.json").write_bytes(token_bytes)
+
+          # Validate the token file structure in a helpful way.
+          try:
+              token_data = json.loads(token_bytes.decode("utf-8"))
+          except Exception as exc:
+              raise SystemExit(f"GOOGLE_TOKEN secret is not valid JSON: {exc}") from exc
+
+          required = {"client_id", "refresh_token", "client_secret"}
+          missing = sorted(required - set(token_data.keys()))
+          if missing:
+              raise SystemExit(f"GOOGLE_TOKEN is missing required fields: {', '.join(missing)}")
+          PY
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
 
       - name: Install Dependencies
         run: |

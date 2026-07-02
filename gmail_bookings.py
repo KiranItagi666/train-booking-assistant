@@ -1,4 +1,5 @@
 from gmail_reader import (
+    GmailAuthError,
     get_gmail_service,
     get_irctc_emails,
     get_email_details,
@@ -11,7 +12,11 @@ from irctc_parser import parse_irctc_email
 
 def get_bookings():
 
-    service = get_gmail_service()
+    try:
+        service = get_gmail_service()
+    except GmailAuthError as exc:
+        print(f"⚠️ Gmail authentication unavailable: {exc}")
+        return []
 
     messages = get_irctc_emails(
         service,
