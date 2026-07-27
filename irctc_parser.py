@@ -18,16 +18,21 @@ def extract_first(pattern, text):
 
 def normalize_date(date_string):
 
-    try:
+    date_string = date_string.strip()
 
-        return datetime.strptime(
-            date_string,
-            "%d-%b-%Y"
-        ).strftime("%Y-%m-%d")
+    # Handle IRCTC's "Sept" month abbreviation
+    date_string = date_string.replace("-Sept-", "-Sep-")
 
-    except Exception:
+    for fmt in ("%d-%b-%Y", "%d-%B-%Y"):
+        try:
+            return datetime.strptime(
+                date_string,
+                fmt
+            ).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
 
-        return date_string
+    return date_string
 
 
 def parse_irctc_email(
@@ -43,7 +48,7 @@ def parse_irctc_email(
 
     subject_pattern = (
         r"Train:\s*(\d+),\s*"
-        r"(\d{2}-[A-Za-z]{3}-\d{4}),\s*"
+        r"(\d{2}-[A-Za-z]{3,4}-\d{4}),\s*"
         r"([^,]+),\s*"
         r"([A-Z]+)\s*-\s*([A-Z]+)"
     )
@@ -53,22 +58,26 @@ def parse_irctc_email(
         subject
     )
 
-    if subject_match:
-
-        booking["train"] = subject_match.group(1)
-
-        booking["date"] = normalize_date(
-            subject_match.group(2)
+    if not subject_match:
+        print(
+            f"Skipping email - subject format not recognized:\n{subject}"
         )
+        return None
 
-        booking["class"] = (
-            subject_match.group(3)
-        )
+    booking["train"] = subject_match.group(1)
 
-        booking["route"] = (
-            f"{subject_match.group(4)}-"
-            f"{subject_match.group(5)}"
-        )
+    booking["date"] = normalize_date(
+        subject_match.group(2)
+    )
+
+    booking["class"] = (
+        subject_match.group(3)
+    )
+
+    booking["route"] = (
+        f"{subject_match.group(4)}-"
+        f"{subject_match.group(5)}"
+    )
 
     # --------------------------------
     # PNR
@@ -152,5 +161,6 @@ if __name__ == "__main__":
 
     print("\nParsed Booking\n")
 
-    for key, value in booking.items():
-        print(f"{key}: {value}")
+    if booking:
+        for key, value in booking.items():
+            print(f"{key}: {value}")

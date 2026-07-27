@@ -15,7 +15,7 @@ def get_bookings():
     try:
         service = get_gmail_service()
     except GmailAuthError as exc:
-        print(f"⚠️ Gmail authentication unavailable: {exc}")
+        print(f"Gmail authentication unavailable: {exc}")
         return []
 
     messages = get_irctc_emails(
@@ -27,34 +27,43 @@ def get_bookings():
 
     for msg in messages:
 
-        email = get_email_details(
-            service,
-            msg["id"]
-        )
+        try:
+            email = get_email_details(
+                service,
+                msg["id"]
+            )
 
-        subject = get_subject(
-            email
-        )
+            subject = get_subject(
+                email
+            )
 
-        if (
-            "Booking Confirmation on IRCTC"
-            not in subject
-        ):
-            continue
+            if "Booking Confirmation on IRCTC" not in subject:
+                continue
 
-        html = decode_email_body(
-            email
-        )
+            html = decode_email_body(
+                email
+            )
 
-        booking = parse_irctc_email(
-            subject,
-            html
-        )
+            booking = parse_irctc_email(
+                subject,
+                html
+            )
 
-        if booking:
+            if not booking:
+                print(f"Skipping email - parser returned None")
+                continue
+
+            if "date" not in booking:
+                print(f"Skipping malformed booking (missing date):")
+                print(booking)
+                continue
+
             bookings.append(
                 booking
             )
+
+        except Exception as exc:
+            print(f"Error parsing email {msg.get('id')}: {exc}")
 
     bookings.sort(
         key=lambda x: x["date"]
@@ -103,10 +112,8 @@ def print_bookings(bookings):
             f"Berth   : {booking.get('berth', '')}"
         )
 
-    print("\n")
-    print(
-        f"Total Bookings: {len(bookings)}"
-    )
+    print()
+    print(f"Total Bookings: {len(bookings)}")
 
 
 def main():
