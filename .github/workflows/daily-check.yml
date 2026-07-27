@@ -54,6 +54,35 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_TOKEN: ${{ secrets.GOOGLE_TOKEN }}
 
+      - name: Debug Restored Files
+        run: |
+          echo "===== Files ====="
+          ls -l
+
+          echo ""
+          echo "===== credentials.json exists ====="
+          test -f credentials.json && echo "YES" || echo "NO"
+
+          echo ""
+          echo "===== token.json exists ====="
+          test -f token.json && echo "YES" || echo "NO"
+
+      - name: Debug token.json
+        run: |
+          python - <<'EOF'
+          import json
+
+          try:
+              with open("token.json") as f:
+                  data = json.load(f)
+
+              print("token.json keys:")
+              print(list(data.keys()))
+
+          except Exception as e:
+              print("ERROR:", e)
+          EOF
+
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
