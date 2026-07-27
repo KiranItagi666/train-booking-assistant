@@ -1,7 +1,6 @@
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 import base64
@@ -18,49 +17,137 @@ class GmailAuthError(RuntimeError):
 
 def get_gmail_service():
 
+    if not os.path.exists("credentials.json"):
+        raise GmailAuthError(
+            "\n"
+            "credentials.json not found.\n\n"
+            "Fix:\n"
+            "1. Download OAuth Desktop Client credentials from Google Cloud.\n"
+            "2. Save it as credentials.json.\n"
+            "3. Update the GOOGLE_CREDENTIALS GitHub Secret."
+        )
+
+    if not os.path.exists("token.json"):
+        raise GmailAuthError(
+            "\n"
+            "token.json not found.\n\n"
+            "Fix:\n"
+            "1. Run:\n"
+            "   python generate_gmail_token.py\n"
+            "2. Sign in to Google.\n"
+            "3. Update the GOOGLE_TOKEN GitHub Secret."
+        )
+
     creds = None
 
-    if os.path.exists("token.json"):
-        try:
-            creds = Credentials.from_authorized_user_file(
-                "token.json",
-                SCOPES
-            )
-        except ValueError as exc:
-            if os.path.exists("token.json"):
-                os.remove("token.json")
-            raise GmailAuthError(
-                f"Stored Gmail token file is invalid: {exc}"
-            ) from exc
+    try:
 
-    if not creds or not creds.valid:
+        creds = Credentials.from_authorized_user_file(
+            "token.json",
+            SCOPES
+        )
 
-        if creds and creds.expired and creds.refresh_token:
+    except ValueError as exc:
+
+        if os.path.exists("token.json"):
+            os.remove("token.json")
+
+        raise GmailAuthError(
+            "\n"
+            "token.json is corrupted or invalid.\n\n"
+            "Fix:\n"
+            "1. Delete token.json.\n"
+            "2. Run generate_gmail_token.py.\n"
+            "3. Update GOOGLE_TOKEN GitHub Secret.\n\n"
+            f"Original Error:\n{exc}"
+        ) from exc
+
+    if not creds.valid:
+
+        if creds.expired and creds.refresh_token:
+
             try:
+
                 creds.refresh(Request())
+
             except RefreshError as exc:
+
+                error = str(exc).lower()
+
                 if os.path.exists("token.json"):
                     os.remove("token.json")
-                raise GmailAuthError(
-                    f"Gmail token refresh failed: {exc}"
-                ) from exc
+
+                if "deleted_client" in error:
+
+                    raise GmailAuthError(
+                        "\n"
+                        "Google OAuth client has been deleted.\n\n"
+                        "Fix:\n"
+                        "1. Create a new OAuth Desktop Client.\n"
+                        "2. Download credentials.json.\n"
+                        "3. Replace credentials.json.\n"
+                        "4. Delete token.json.\n"
+                        "5. Run generate_gmail_token.py.\n"
+                        "6. Update GOOGLE_CREDENTIALS.\n"
+                        "7. Update GOOGLE_TOKEN."
+                    ) from exc
+
+                elif "invalid_grant" in error:
+
+                    raise GmailAuthError(
+                        "\n"
+                        "Google refresh token is no longer valid.\n\n"
+                        "Fix:\n"
+                        "1. Delete token.json.\n"
+                        "2. Run generate_gmail_token.py.\n"
+                        "3. Sign in again.\n"
+                        "4. Update GOOGLE_TOKEN GitHub Secret."
+                    ) from exc
+
+                elif "invalid_client" in error:
+
+                    raise GmailAuthError(
+                        "\n"
+                        "credentials.json does not match the OAuth client.\n\n"
+                        "Fix:\n"
+                        "Download the correct credentials.json from the same "
+                        "Google Cloud project that created the token."
+                    ) from exc
+
+                else:
+
+                    raise GmailAuthError(
+                        "\n"
+                        "Google OAuth token refresh failed.\n\n"
+                        f"{exc}"
+                    ) from exc
+
             except Exception as exc:
+
                 if os.path.exists("token.json"):
                     os.remove("token.json")
+
                 raise GmailAuthError(
-                    f"Gmail authentication failed: {exc}"
+                    "\n"
+                    "Unexpected Gmail authentication failure.\n\n"
+                    f"{exc}"
                 ) from exc
+
+            with open("token.json", "w") as token:
+                token.write(
+                    creds.to_json()
+                )
 
         else:
+
             if os.path.exists("token.json"):
                 os.remove("token.json")
-            raise GmailAuthError(
-                "No valid Gmail credentials available."
-            )
 
-        with open("token.json", "w") as token:
-            token.write(
-                creds.to_json()
+            raise GmailAuthError(
+                "\n"
+                "No valid Gmail credentials available.\n\n"
+                "Run:\n"
+                "python generate_gmail_token.py"
             )
 
     return build(
@@ -122,9 +209,7 @@ def decode_email_body(email):
                     "text/html"
                 ]:
 
-                    data = part["body"].get(
-                        "data"
-                    )
+                    data = part["body"].get("data")
 
                     if not data:
                         continue
@@ -136,9 +221,7 @@ def decode_email_body(email):
                         errors="ignore"
                     )
 
-        data = email["payload"]["body"].get(
-            "data"
-        )
+        data = email["payload"]["body"].get("data")
 
         if data:
 
@@ -149,9 +232,9 @@ def decode_email_body(email):
                 errors="ignore"
             )
 
-    except Exception as e:
+    except Exception as exc:
 
-        return f"ERROR: {e}"
+        return f"ERROR: {exc}"
 
     return ""
 
@@ -172,7 +255,18 @@ def save_email_html(
 
 def main():
 
-    service = get_gmail_service()
+    try:
+
+        service = get_gmail_service()
+
+    except GmailAuthError as exc:
+
+        print("=" * 80)
+        print("GMAIL AUTHENTICATION ERROR")
+        print("=" * 80)
+        print(exc)
+        print("=" * 80)
+        return
 
     messages = get_irctc_emails(
         service
